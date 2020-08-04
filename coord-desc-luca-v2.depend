@@ -1,0 +1,19 @@
+# depslib dependency file v1.0
+1596030604 source:c:\users\alice\documents\2019 - oxford\europ\coord-desc-luca-v1.2\main.cpp
+	<cstdlib>
+	<cstdio>
+	<cmath>
+	<cstring>
+	"vec.h"
+
+1595841131 c:\users\alice\documents\2019 - oxford\europ\coord-desc-luca-v1.2\vec.h
+
+1596038108 source:c:\users\alice\documents\2019 - oxford\europ\coord-desc-luca-v2\main.cpp
+	<cstdlib>
+	<cstdio>
+	<cmath>
+	<cstring>
+	"vec.h"
+
+1596038108 c:\users\alice\documents\2019 - oxford\europ\coord-desc-luca-v2\vec.h
+
