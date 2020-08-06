@@ -12,16 +12,7 @@
    Written by Luca di Mare 25 Jul 2020 17:02:44
  */
 
-/* Tasks for Yi Fong
-
-   Task #1 : perhaps you could check that I haven't made any mistakes and that
-   the code actually works in its present shape!
-
-   Task #2 : this line search uses a pseudo-Newton method
-   which assumes that the objective function is smooth. There is an
-   important improvement to make: it needs to be genuinely iterative
-   so that the outcome does not depend on the value of delta.
-   Can you add an inner iteration loop that determines the local minimum iteratively?
+/* Update 6 August 2020: adding valley detection.
  */
 
 // Rosenbrock function
@@ -61,7 +52,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f )
     // values declared here because they reset with each iteration
     bool dirfound = 0;  // direction finding success flag
     int sdn = 1;        // hard iteration limit so no going out of control
-    int stepdir = 1;    // either 1 or -1, multiply to e to set direction
+    // int stepdir = 1;    // either 1 or -1, multiply to e to set direction
     // actually determine search direction
     while(dirfound == 0 && sdn <= 20)
     {
@@ -81,21 +72,38 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f )
 
         if (f1 < f0){
             // We are moving in a direction of descent! Terminate the loop.
-            printf("Dir trial %i success! \t\tstepdir = %i \td = %f \n\n",sdn,stepdir,delta);
+            printf("Dir trial %i success! \t\td = %f \n\n",sdn,delta);
             dirfound = 1;
         } else {
             // reverse direction and halve, and check other side
-            printf("Dir trial %i fail! \tstepdir = %i \td = %f \n\n",sdn,stepdir,delta);
-            delta *= -0.5;
-            stepdir *= -1;
+            printf("Dir trial %i fail! \td = %f \n\n",sdn,delta);
+            delta *= -0.1;      // decreased from -0.5 to make more performant
+            // stepdir *= -1;
         }
+
+        sdn++;
     }
 
     /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
        2. Perform line search, calculating step length
        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
     printf("***PERFORM LINE SEARCH***\n");
-    double e = 0.5 * stepdir;   // try a step of arbitrary length e, pointing the right way
+    /* Try a step of arbitrary length e, pointing the right way.
+
+       UPDATE: simple modification to prevent overshoot. Instead of:
+           double e = 0.5 * stepdir; (Version A)
+       We have:
+           double e = 5000 * delta;  (Version B)
+       So that step size scales with results from previous direction search.
+       Furthermore eliminates need to use holder variable stepdir.
+       Version iteration:  A    B    C
+       Step 4  Dir 1      13   13   15
+       Step 26 Dir 1      37   24   16
+       Step 29 Dir 0      36   21   16
+       Feel free to implement gradient-based method later on.
+     */
+    // double e = 0.5 * stepdir;
+    double e = 5000 * delta;
     double esuccess = e;        // holder variable for successful step length
     double a = 3;
     double b = 0.5;             // values recommended by paper
@@ -122,13 +130,13 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f )
             e = e*b;
             failcount += 1;
         }
-        printf("%i %i \n",succount,failcount);
+        printf("%i %i %i \n",succount,failcount,lsn);
         lsn++;
     }
 
 //fmav( dim, zeros, esuccess, l, &y );    // write step length
-    f  = f1;        // write new function value
-    y= esuccess;
+    f = f1;         // write new function value
+    y = esuccess;
     printf("\n");   // OCD
 
     return;
@@ -185,7 +193,6 @@ int main()
              if( fun(x) > f[h] ){ fmav( dim, x,y[h],v[h],   x); }
 
         }
-
 
 // Generate new set of orthogonal directions, see Equation 8 in the paper.
         for( h=0;h<dim;h++ )
