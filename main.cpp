@@ -100,28 +100,46 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
        2. Perform line search, calculating step length
        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
     printf("***PERFORM LINE SEARCH***\n");
-    /* Try a step of arbitrary length e, pointing the right way.
-
-       UPDATE: simple modification to prevent overshoot. Instead of:
-           double e = 0.5 * stepdir; (Version A)
-       We have:
-           double e = 5000 * delta;  (Version B)
-       So that step size scales with results from previous direction search.
-       Furthermore eliminates need to use holder variable stepdir.
-       Version iteration:  A    B    C
-       Step 4  Dir 1      13   13   15
-       Step 26 Dir 1      37   24   16
-       Step 29 Dir 0      36   21   16
-       Feel free to implement gradient-based method later on.
+    /* First, attempt regula falsi method.
+       If that fails, revert back to previous method.
      */
     double e = 5000 * delta;
     double esuccess = e;        // holder variable for successful step length
     double a = 3;
     double b = 0.5;             // values recommended by paper
-    int lsn = 1;                // hard iteration limit so no going out of control
+    int lsn = 0;                // hard iteration limit so no going out of control
     int succount = 0;
     int failcount = 0;
-    f1 = f0;                    // now use f1 as a holder variable for the most successful trial
+
+        /* %%%%%%%%%%%%%%%%%%%%%%%%%
+            REGULA FALSI, ONE TRIAL
+           %%%%%%%%%%%%%%%%%%%%%%%%% */
+    fmav( dim, x0, e, l, x1 );  // set a point x1 some distance away
+    f1 = fun(x1);
+    // DEBUG
+    printf("c1 = %f, %f \tF1 = %f   \te = %f   \n",x1[0],x1[1],f1,e);
+
+    interpol( dim, x0, x1, -f0, f1, xt );   // find trial estimated minima point
+    ft = fun(xt);
+    // DEBUG
+    lsn = 2;    // two function evaluations in RF trial
+    printf("ct = %f, %f \tFt = %f\n",xt[0],xt[1],ft);
+
+    // if regula falsi is successful, skip the loop!
+    if( ft < f1 && ft < f0 ){
+        esuccess = e * (f0 / (f0+f1));  // recalculate successful step size taken for output
+        succount = 1;
+        failcount = 5;  // modify flags to ensure following while loop isn't triggered
+        printf("Regula falsi successful! \n");
+    } else {
+        printf("Regula falsi failed! Reverting to previous method...\n\n");
+        f1 = f0;    // use f1 as holder variable for most successful trial
+    }
+        /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            REGULA FALSI END
+            IF FAILED, REVERT TO PREVIOUS METHOD
+           %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
+
     // calculate actual step length
     while((succount < 1 || failcount < 5) && lsn <= 500)
     {
@@ -145,9 +163,9 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         lsn++;
     }
 
-    f = f1;         // write new function value
+    f = ft;         // write new function value
     y = esuccess;
-    results = lsn-1;
+    results = lsn;
     printf("\n");   // OCD
 
     return;
@@ -155,8 +173,9 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
 
 int main()
 {
-    int j,h,k;  // iteration variables
-    int dim=N;  // number of dimensions of the problem
+    int j,h,k;          // iteration variables
+    int dim=N;          // number of dimensions of the problem
+    int outloops=30;    // set number of outer loops here
 
     double v[N][N]={ {1,0},{0,1} }; // orthogonal vectors, {0,1) and (1,0) for Rosenbrock
     double y[N]={0,0};
@@ -170,13 +189,13 @@ int main()
        Second  and third column hold the number of evaluations for line search, each direction.
        Fourth column holds the total number of evaluations for the iteration.
      */
-    int results[30][4];
+    int results[outloops][4];
 
     // DEBUG
     printf( "Starting coordinates: c = %f, %f \n", x[0],x[1] );
     printf( "Starting value:       f = %f \n\n", fun(x) );
 
-    for( k=0;k<30;k++ )     // outer loop, through each SET of orthogonal vectors
+    for( k=0;k<outloops;k++ )     // outer loop, through each SET of orthogonal vectors
     {
         // DEBUG
         printf( "***STEP %i*** \n\n", k );
@@ -227,15 +246,15 @@ int main()
             for( j=0;j<h;j++ ){ gsot( dim, v[h], v[j] ); }
             norml( dim, v[h] );
         }
+    }
 
-        // DEBUG: print results array
-        printf("***NUMBER OF FUNCTION EVALUATIONS FOR EACH ITERATION AND DIRECTION***\n");
-        printf("Step 1\tDir 0\tDir 1\tTotal\n");
-        for( h=0;h<30;h++ )
-        {
-            for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
-            printf(" \n");
-        }
+    // DEBUG: print results array
+    printf("***NUMBER OF FUNCTION EVALUATIONS FOR LINE SEARCH IN EACH ITERATION AND DIRECTION***\n");
+    printf("Step 1\tDir 0\tDir 1\tTotal\n");
+    for( h=0;h<outloops;h++ )
+    {
+        for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
+        printf(" \n");
     }
 
     exit(0);

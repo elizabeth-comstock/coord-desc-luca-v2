@@ -15,6 +15,16 @@ inline void fmav( int dim, double *x, double a, double *y, double *z )
     }
 }
 
+/* Linear interpolation function for regula falsi.
+ */
+inline void interpol( int dim, double *x1, double *x2, double b1, double b2, double *x )
+{
+    for( int i=0;i<dim;i++ )
+    {
+        x[i]= ( b1*x2[i] - b2*x1[i] )/( b1 - b2 );
+    }
+}
+
 /* Normalize vector to unit norm */
 inline void norml( int dim, double *x )
 {
