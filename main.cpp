@@ -36,7 +36,6 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     double delta=1.e-4;
     double x1[N];
     double xt[N];
-    double zeros[N] = {0,0};
 
     /* A line search contains the following steps:
        1. Determine search direction, positive or negative. This is performed
@@ -200,9 +199,7 @@ int main()
         // DEBUG
         printf( "***STEP %i*** \n\n", k );
 
-        int    hmin=-1;
-        double fmin=1e16;
-        int    ismin[N]={0,0};   // adds minima detection functionality
+        int ismin[N]={0,0};   // adds minima detection functionality
 
         // Section 3.1 of Rosenbrock's paper with modified line search
         for(h=0; h<2; h++)
