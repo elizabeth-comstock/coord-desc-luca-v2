@@ -32,10 +32,12 @@ double fun( double *x )
  **/
 void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, int &results )
 {
-    double f1,f0,ft;
+    double fd,f1,f0,ft;
+    double grad1, grad0, gradt;
     double delta=1.e-4;
     double x1[N];
     double xt[N];
+    double xd[N];
 
     /* A line search contains the following steps:
        1. Determine search direction, positive or negative. This is performed
@@ -57,26 +59,28 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     printf("***ORTHOGONAL VECTOR***\n");
     printf("v  = %f, %f\t\n\n",l[0],l[1]);
     printf("***DETERMINE SEARCH DIRECTION***\n");
-    printf("c0 = %f, %f \tF0 = %f \n\n", x0[0],x0[1],f0);
+    printf("c0 = %f, %f \tF0 = %f \n", x0[0],x0[1],f0);
 
     // actually determine search direction
     while(dirfound == 0 && sdn <= 4)
     {
-        // take a small step from x0 and write coordinates to x1
-        fmav( dim, x0, delta,l, x1 );
-
-        f1 = fun( x1 ); // new function value
+        // take a small step from x0 and write coordinates to xt
+        fmav(dim, x0, delta, l, xt);
+        ft = fun(xt); // new function value
 
         // DEBUG
-        printf("c1 = %f, %f \tF1 = %f \t\t", x1[0],x1[1],f1);
+        printf("ct = %f, %f \tFt = %f \t\t", xt[0],xt[1],ft);
 
-        if (f1 < f0){
+        if (ft < f0){
+            // calc gradient at original pt, taking descent direction as positive
+            grad0 = (ft-f0)/delta;
             // We are moving in a direction of descent! Terminate the loop.
-            printf("Dir trial %i success! \td = %f \n\n",sdn,delta);
             dirfound = 1;
+            printf("grad0 = %f \n", grad0);
+            printf("Dir trial %i success! \td = %f \n\n", sdn,delta);
         } else {
             // reverse direction and halve, and check other side
-            printf("Dir trial %i fail! \td = %f \n",sdn,delta);
+            printf("Dir trial %i fail! \td = %f \n", sdn,delta);
             delta *= -0.1;      // decreased from -0.5 to make more performant
         }
 
@@ -99,47 +103,83 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
        2. Perform line search, calculating step length
        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
     printf("***PERFORM LINE SEARCH***\n");
-    /* First, attempt regula falsi method.
-       If that fails, revert back to previous method.
-     */
+    // First, attempt regula falsi method. If that fails, revert back to previous method.
+
+    // STEP LENGTHS
     double e = 5000 * delta;
-    double esuccess = e;        // holder variable for successful step length
+    double esuccess;
+    double e0 = 0;
+
+    // ROSENBROCK SLEDGEHAMMER
     double a = 3;
-    double b = 0.5;             // values recommended by paper
-    int lsn = 0;                // hard iteration limit so no going out of control
+    double b = 0.5;     // values recommended by paper
+    int lsn = 0;        // hard iteration limit so no going out of control
     int succount = 0;
     int failcount = 0;
 
-        /* %%%%%%%%%%%%%%%%%%%%%%%%%
-            REGULA FALSI, ONE TRIAL
-           %%%%%%%%%%%%%%%%%%%%%%%%% */
+    // REGULA FALSI
+    double P, Q;
+
+        /* %%%%%%%%%%%%%%%%%%%%%%%%%%%
+            REGULA FALSI, FIVE TRIALS
+           %%%%%%%%%%%%%%%%%%%%%%%%%%% */
     fmav( dim, x0, e, l, x1 );  // set a point x1 some distance away
     f1 = fun(x1);
-    // DEBUG
-    printf("c1 = %f, %f \tF1 = %f   \te = %f   \n",x1[0],x1[1],f1,e);
 
-    interpol( dim, x0, x1, -f0, f1, xt );   // find trial estimated minima point
-    ft = fun(xt);
-    // DEBUG
-    lsn = 2;    // two function evaluations in RF trial
-    printf("ct = %f, %f \tFt = %f\n",xt[0],xt[1],ft);
+    for (int i=1; i<=5; i++)
+    {
+        // DEBUG
+        printf("A = %f, %f \tFA = %f\n",x0[0],x0[1],f0);
+        printf("B = %f, %f \tFB = %f   \teB = %f   \n",x1[0],x1[1],f1,e);
+        // interpol( dim, x0, x1, -f0, f1, xt );   // find trial estimated minima point
+        // treat the descent direction as an axis, calculate step size, then calculate coordinates and function value
+        P = ipstep( e0, e, -f0, f1 );
+        fmav( dim, x0, P, l, xt );
+        ft = fun(xt);
+        // DEBUG
+        lsn = 2;    // two function evaluations in RF trial
+        printf("P = %f, %f \tFP = %f    \teP = %f\t",xt[0],xt[1],ft,P);
 
-    // if regula falsi is successful, skip the loop!
-    if( ft < f1 && ft < f0 ){
-        esuccess = e * (f0 / (f0+f1));  // recalculate successful step size taken for output
-        succount = 1;
-        failcount = 5;  // modify flags to ensure following while loop isn't triggered
-        printf("Regula falsi successful! \n");
-    } else {
-        printf("Regula falsi failed! Reverting to previous method...\n\n");
-        f1 = f0;    // use f1 as holder variable for most successful trial
+        // evaluate gradient at x1
+        fmav( dim, x1, delta, l, xd );  // offset x1 by delta
+        fd = fun(xd);
+        grad1 = (fd-f1)/delta;
+
+        /* Equation 15 can't be implemented on vectors!
+           Instead we take A and B to be the step length along the searchdir.
+         */
+        Q = (f1-f0+e0*grad0-e*grad1)/(grad0-grad1);
+        printf("eQ = %f\n\n",Q);
+
+        // now narrow the bracket
+        if (P < Q) {
+            e0 = P;
+            e = Q;
+        } else {
+            e0 = Q;
+            e = P;
+        }
+
+        /* and update coordinates
+           Q (x1) MUST BE UPDATED BEFORE P (x0) BECAUSE x0 IS OVERWRITTEN
+         */
+        fmav( dim, x0, e, l, x1 );
+        fmav( dim, x0, e0, l, x0 );
+
+        /*
+        // if regula falsi is successful, skip the loop!
+        if( ft < f1 && ft < f0 ){
+            esuccess = e * (f0 / (f0+f1));  // recalculate successful step size taken for output
+
+            printf("Regula falsi successful! \n");
+        } else {
+            printf("Regula falsi failed! Reverting to previous method...\n\n");
+            f1 = f0;        // use f1 as holder variable for most successful trial
+        }
+        */
     }
-        /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            REGULA FALSI END
-            IF FAILED, REVERT TO PREVIOUS METHOD
-           %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 
-    // calculate actual step length
+    // if regula falsi fails, fall back to Rosenbrock sledgehammer
     while((succount < 1 || failcount < 5) && lsn <= 500)
     {
         // do a trial

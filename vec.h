@@ -16,6 +16,9 @@ inline void fmav( int dim, double *x, double a, double *y, double *z )
 }
 
 /* Linear interpolation function for regula falsi.
+   There are two versions:
+   interpol() provides the actual coordinates
+   ipstep() provides the required step length
  */
 inline void interpol( int dim, double *x1, double *x2, double b1, double b2, double *x )
 {
@@ -23,6 +26,11 @@ inline void interpol( int dim, double *x1, double *x2, double b1, double b2, dou
     {
         x[i]= ( b1*x2[i] - b2*x1[i] )/( b1 - b2 );
     }
+}
+
+inline double ipstep( double e1, double e2, double f1, double f2 )
+{
+    return ( f1*e2 - f2*e1 )/( f1 - f2 );
 }
 
 /* Normalize vector to unit norm */
