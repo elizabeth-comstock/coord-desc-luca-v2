@@ -33,6 +33,18 @@ inline double ipstep( double e1, double e2, double f1, double f2 )
     return ( f1*e2 - f2*e1 )/( f1 - f2 );
 }
 
+/* Compares function value at four reference points for line search */
+inline char least( double A, double B, double P )
+{
+    if ( A<B && A<P ){
+        return 'A';
+    } else if ( B<A && B<P ){
+        return 'B';
+    } else {
+        return 'P';
+    }
+}
+
 /* Normalize vector to unit norm */
 inline void norml( int dim, double *x )
 {

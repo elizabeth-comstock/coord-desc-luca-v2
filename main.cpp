@@ -34,12 +34,14 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
 {
     double fP,fd,fB,fA,f0,ft;
     double gradA, gradB, gradt;
-    double delta=1.e-4;
-    double xt[N];
-    double xd[N];
-    double xA[N];
-    double xB[N];
-    double xP[N];
+    // double delta=1.e-4;
+    double delta=1.e-6;
+    double xt[N],xd[N],xA[N],xB[N],xP[N];
+    //double xt[N];
+    //double xd[N];
+    //double xA[N];
+    //double xB[N];
+    //double xP[N];
 
     int lsn = 0;
 
@@ -67,7 +69,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     printf("c0 = %f, %f \tF0 = %f \n", x0[0],x0[1],f0);
 
     // actually determine search direction
-    while(dirfound == 0 && sdn <= 4)
+    while(dirfound == 0 && sdn <= 2)
     {
         // take a small step from x0 and write coordinates to xt
         fmav(dim, x0, delta, l, xt);
@@ -87,7 +89,8 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         } else {
             // reverse direction and halve, and check other side
             printf("Dir trial %i fail! \td = %f \n", sdn,delta);
-            delta *= -0.1;      // decreased from -0.5 to make more performant
+            // delta *= -0.1;      // decreased from -0.5 to make more performant
+            delta *= -1;
         }
 
         sdn++;
@@ -112,11 +115,15 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     // First, attempt regula falsi method. If that fails, revert back to previous method.
 
     // STEP LENGTHS
-    double eB = 5000 * delta;
-    double esuccess;
+    // double eB = 500000 * delta;
+    double eB, eP, eQ, esuccess;
+    if (fabs(gradA) < 0.5){
+        eB = 100000 * delta;
+    } else {
+        eB = abs(2319*gradA) * delta;
+    }
     double e0 = 0;
     double eA = e0;
-    double eP, eQ;
 
     // ROSENBROCK SLEDGEHAMMER
     double a = 3;
@@ -144,7 +151,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         fmav( dim, x0, eP, l, xP );
         fP = fun(xP);
         // DEBUG
-        printf("P = %f, %f \tFP = %f    \teP = %f\t",xP[0],xP[1],fP,eP);
+        printf("P = %f, %f \tFP = %f    \teP = %f\t\t",xP[0],xP[1],fP,eP);
 
         // evaluate gradient at x1
         fmav( dim, xB, delta, l, xd );  // offset x1 by delta
@@ -159,14 +166,32 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         lsn += 2;
         printf("eQ = %f\tlsn = %i\n\n",eQ,lsn);
 
-        // now narrow the bracket
-        if (eP < eQ) {
-            eA = eP;
-            eB = eQ;
-        } else {
-            eA = eQ;
+        switch(char minnie = least(fA, fB, fP))
+        {
+        case 'A':
+            esuccess = eA;
+            // A is lower than B and P. Shorten the bracket:
             eB = eP;
+            break;
+        case 'B':
+            esuccess = eB;
+            // B is lower than P, we need to keep going:
+            eB *= 2;
+            break;
+        default:
+            esuccess = eP;
+            // narrow the bracket
+            if (eP < eQ) {
+                eA = eP;
+                eB = eQ;
+            } else {
+                eA = eQ;
+                eB = eP;
+            }
+            break;
         }
+
+        printf("esuccess = %f\n\n", esuccess);
 
         /* and update coordinates
            Q (x1) MUST BE UPDATED BEFORE P (x0) BECAUSE x0 IS OVERWRITTEN
@@ -177,7 +202,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         fA = fun(xA);
         fB = fun(xB);
 
-        esuccess = eP;
+        // esuccess = eP;
         lsn += 2;
 
         /*
@@ -217,7 +242,11 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     }
     */
     f = fP;         // write new function value
-    y = esuccess;
+    if (fabs(esuccess) <= 1.e-6){
+        y = (1.e-6) * delta;
+    } else {
+        y = esuccess;
+    }
     results = lsn;
     printf("\n");   // OCD
 
