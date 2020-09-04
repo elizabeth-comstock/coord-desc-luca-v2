@@ -12,9 +12,6 @@
    Written by Luca di Mare 25 Jul 2020 17:02:44
  */
 
-/* Update 6 August 2020: adding valley detection.
- */
-
 // Rosenbrock function
 double fun( double *x )
 {
@@ -34,14 +31,8 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
 {
     double fP,fd,fB,fA,f0,ft;
     double gradA, gradB, gradt;
-    // double delta=1.e-4;
     double delta=1.e-6;
     double xt[N],xd[N],xA[N],xB[N],xP[N];
-    //double xt[N];
-    //double xd[N];
-    //double xA[N];
-    //double xB[N];
-    //double xP[N];
 
     int lsn = 0;
 
@@ -56,13 +47,11 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
        1. For each vector, determine search direction
           fmav function linearly adds vectors
        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
-    // values declared here because they reset with each iteration
     bool dirfound = 0;  // direction finding success flag
     int sdn = 1;        // hard iteration limit so no going out of control
-    f0 = fun(x0);     // original function value
+    f0 = fun(x0);       // original function value
 
     // DEBUG
-    // lsn += 1;
     printf("***ORTHOGONAL VECTOR***\n");
     printf("v  = %f, %f\t\n\n",l[0],l[1]);
     printf("***DETERMINE SEARCH DIRECTION***\n");
@@ -75,8 +64,6 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         fmav(dim, x0, delta, l, xt);
         ft = fun(xt); // new function value
 
-        // DEBUG
-        // lsn += 1;
         printf("ct = %f, %f \tFt = %f \t\t", xt[0],xt[1],ft);
 
         if (ft < f0){
@@ -89,7 +76,6 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         } else {
             // reverse direction and halve, and check other side
             printf("Dir trial %i fail! \td = %f \n", sdn,delta);
-            // delta *= -0.1;      // decreased from -0.5 to make more performant
             delta *= -1;
         }
 
@@ -97,14 +83,13 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     }
 
     /* Minima detection: if 4 iterations of direction search have
-       failed at this point, we're probably at a minima along the axis.
-     */
+       failed at this point, we're probably at a minima along the axis. */
     if(dirfound == 0){
         printf("Minima found along test direction! \n\n");
         ismin = 1;
         results = 0;
         f = f0;
-        y = (1.e-6) * delta;
+        y = (1.e-6);
         return;
     }
 
@@ -112,16 +97,10 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
        2. Perform line search, calculating step length
        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
     printf("***PERFORM LINE SEARCH***\n");
-    // First, attempt regula falsi method. If that fails, revert back to previous method.
 
     // STEP LENGTHS
-    // double eB = 500000 * delta;
     double eB, eP, eQ, esuccess;
-    if (fabs(gradA) < 0.5){
-        eB = 100000 * delta;
-    } else {
-        eB = abs(2319*gradA) * delta;
-    }
+    eB = fabs(2319*gradA) * delta;
     double e0 = 0;
     double eA = e0;
 
@@ -140,12 +119,11 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     fB = fun(xB);
     lsn += 1;
 
-    for (int i=1; i<=2; i++)
+    for (int i=1; i<=1; i++)
     {
         // DEBUG
         printf("A = %f, %f \tFA = %f\n",xA[0],xA[1],fA);
         printf("B = %f, %f \tFB = %f   \teB = %f   \n",xB[0],xB[1],fB,eB);
-        // interpol( dim, x0, x1, -f0, f1, xt );   // find trial estimated minima point
         // treat the descent direction as an axis, calculate step size, then calculate coordinates and function value
         eP = ipstep( eA, eB, -fA, fB );
         fmav( dim, x0, eP, l, xP );
@@ -159,12 +137,11 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         gradB = (fd-fB)/delta;
 
         /* Equation 15 can't be implemented on vectors!
-           Instead we take A and B to be the step length along the searchdir.
-         */
+           Instead we take A and B to be the step length along the searchdir. */
         eQ = (fB-fA+eA*gradA-eB*gradB)/(gradA-gradB);
 
         lsn += 2;
-        printf("eQ = %f\tlsn = %i\n\n",eQ,lsn);
+        printf("eQ = %f\tlsn = %i\n",eQ,lsn);
 
         switch(char minnie = least(fA, fB, fP))
         {
@@ -191,64 +168,26 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
             break;
         }
 
-        printf("esuccess = %f\n\n", esuccess);
+        printf("esuccess = %f\n", esuccess);
 
-        /* and update coordinates
-           Q (x1) MUST BE UPDATED BEFORE P (x0) BECAUSE x0 IS OVERWRITTEN
-         */
+        // and update coordinates
         fmav( dim, x0, eA, l, xA );
         fmav( dim, x0, eB, l, xB );
 
         fA = fun(xA);
         fB = fun(xB);
 
-        // esuccess = eP;
         lsn += 2;
-
-        /*
-        // if regula falsi is successful, skip the loop!
-        if( ft < f1 && ft < f0 ){
-            esuccess = e * (f0 / (f0+f1));  // recalculate successful step size taken for output
-
-            printf("Regula falsi successful! \n");
-        } else {
-            printf("Regula falsi failed! Reverting to previous method...\n\n");
-            f1 = f0;        // use f1 as holder variable for most successful trial
-        }
-        */
     }
-    /*
-    // if regula falsi fails, fall back to Rosenbrock sledgehammer
-    while((succount < 1 || failcount < 5) && lsn <= 500)
-    {
-        // do a trial
-        fmav( dim, x0, e, l, xt );
-        ft = fun(xt);
-        // DEBUG
-        printf("ct = %f, %f \tFt = %f   \te = %f   \t",xt[0],xt[1],ft,e);
 
-        if (ft <= f1) {
-            f1 = ft;            // update function value to lowest found
-            esuccess = e;
-            e = e*a;
-            succount += 1;
-            failcount = 0;      // we want one success and five fails in succession
-        } else {
-            e = e*b;
-            failcount += 1;
-        }
-        printf("%i %i %i \n",succount,failcount,lsn);
-        lsn++;
-    }
-    */
     f = fP;         // write new function value
     if (fabs(esuccess) <= 1.e-6){
-        y = (1.e-6) * delta;
+        y = (1.e-6);
     } else {
         y = esuccess;
     }
     results = lsn;
-    printf("\n");   // OCD
+    printf("\n");
 
     return;
 }
