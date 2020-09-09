@@ -2,6 +2,7 @@
 # include <cstdio>
 # include <cmath>
 # include <cstring>
+# include <ctime>
 
 # include "vec.h"
 
@@ -50,6 +51,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     bool dirfound = 0;  // direction finding success flag
     int sdn = 1;        // hard iteration limit so no going out of control
     f0 = fun(x0);       // original function value
+    lsn += 1;
 
     // DEBUG
     printf("***ORTHOGONAL VECTOR***\n");
@@ -63,6 +65,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         // take a small step from x0 and write coordinates to xt
         fmav(dim, x0, delta, l, xt);
         ft = fun(xt); // new function value
+        lsn += 1;
 
         printf("ct = %f, %f \tFt = %f \t\t", xt[0],xt[1],ft);
 
@@ -119,22 +122,24 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     fB = fun(xB);
     lsn += 1;
 
-    for (int i=1; i<=1; i++)
+    for (int i=1; i<=2; i++)
     {
         // DEBUG
         printf("A = %f, %f \tFA = %f\n",xA[0],xA[1],fA);
         printf("B = %f, %f \tFB = %f   \teB = %f   \n",xB[0],xB[1],fB,eB);
-        // treat the descent direction as an axis, calculate step size, then calculate coordinates and function value
-        eP = ipstep( eA, eB, -fA, fB );
-        fmav( dim, x0, eP, l, xP );
-        fP = fun(xP);
-        // DEBUG
-        printf("P = %f, %f \tFP = %f    \teP = %f\t\t",xP[0],xP[1],fP,eP);
 
         // evaluate gradient at x1
         fmav( dim, xB, delta, l, xd );  // offset x1 by delta
         fd = fun(xd);
         gradB = (fd-fB)/delta;
+
+        // treat the descent direction as an axis, calculate step size, then calculate coordinates and function value
+        eP = ipstep( eA, eB, -fA, fB );
+        fmav( dim, x0, eP, l, xP );
+        fP = fun(xP);
+
+        // DEBUG
+        printf("P = %f, %f \tFP = %f    \teP = %f\t\t",xP[0],xP[1],fP,eP);
 
         /* Equation 15 can't be implemented on vectors!
            Instead we take A and B to be the step length along the searchdir. */
@@ -186,6 +191,10 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     } else {
         y = esuccess;
     }
+
+    // float r = 1.15 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(0.1)));
+    // y *= r;
+
     results = lsn;
     printf("\n");
 
@@ -205,6 +214,8 @@ int main()
 
     double x[N]= {-1.2,1};          // starting point, (-1.2,1) for Rosenbrock
 
+    // srand (static_cast <unsigned> (time(0)));
+
     /* DEBUG: results matrix to hold number of function evaluations
        First column holds the iteration number.
        Second  and third column hold the number of evaluations for line search, each direction.
@@ -216,10 +227,15 @@ int main()
     printf( "Starting coordinates: c = %f, %f \n", x[0],x[1] );
     printf( "Starting value:       f = %f \n\n", fun(x) );
 
+    FILE *fi;
+    fi= fopen( "points.dat","w" );
+
     for( k=0;k<outloops;k++ )     // outer loop, through each SET of orthogonal vectors
     {
         // DEBUG
         printf( "***STEP %i*** \n\n", k );
+
+        fprintf( fi,"% 12.5e %12.5e \n", x[0],x[1] );
 
         int ismin[N]={0,0};   // adds minima detection functionality
 
@@ -275,6 +291,8 @@ int main()
         for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
         printf(" \n");
     }
+
+    fclose( fi );
 
     exit(0);
 }
