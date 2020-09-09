@@ -33,10 +33,10 @@ double fun( double *x )
 void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, int &results )
 {
     double f1,f0,ft;
-    double delta=1.e-4;
-    double x1[N];
-    double xt[N];
+    double delta=1.e-6;
+    double x1[N], xt[N];
     double zeros[N] = {0,0};
+    int lsn = 0;
 
     /* A line search contains the following steps:
        1. Determine search direction, positive or negative. This is performed
@@ -53,6 +53,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     bool dirfound = 0;  // direction finding success flag
     int sdn = 1;        // hard iteration limit so no going out of control
     f0 = fun( x0 );     // original function value
+    lsn += 1;
 
     // DEBUG
     printf("***ORTHOGONAL VECTOR***\n");
@@ -61,13 +62,12 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     printf("c0 = %f, %f \tF0 = %f \n\n", x0[0],x0[1],f0);
 
     // actually determine search direction
-    while(dirfound == 0 && sdn <= 4)
+    while(dirfound == 0 && sdn <= 2)
     {
         // take a small step from x0 and write coordinates to x1
         fmav( dim, x0, delta,l, x1 );
-
         f1 = fun( x1 ); // new function value
-
+        lsn += 1;
         // DEBUG
         printf("c1 = %f, %f \tF1 = %f \t\t", x1[0],x1[1],f1);
 
@@ -118,16 +118,16 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     double esuccess = e;        // holder variable for successful step length
     double a = 3;
     double b = 0.5;             // values recommended by paper
-    int lsn = 1;                // hard iteration limit so no going out of control
     int succount = 0;
     int failcount = 0;
     f1 = f0;                    // now use f1 as a holder variable for the most successful trial
     // calculate actual step length
-    while((succount < 1 || failcount < 5) && lsn <= 500)
+    while((succount < 1 || failcount < 3) && lsn <= 500)
     {
         // do a trial
         fmav( dim, x0, e, l, xt );
         ft = fun(xt);
+        lsn += 1;
         // DEBUG
         printf("ct = %f, %f \tFt = %f   \te = %f   \t",xt[0],xt[1],ft,e);
 
@@ -142,12 +142,11 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
             failcount += 1;
         }
         printf("%i %i %i \n",succount,failcount,lsn);
-        lsn++;
     }
 
     f = f1;         // write new function value
     y = esuccess;
-    results = lsn-1;
+    results = lsn;
     printf("\n");   // OCD
 
     return;
@@ -171,15 +170,21 @@ int main()
        Fourth column holds the total number of evaluations for the iteration.
      */
     int results[30][4];
+    int funceval = 0;
 
     // DEBUG
     printf( "Starting coordinates: c = %f, %f \n", x[0],x[1] );
     printf( "Starting value:       f = %f \n\n", fun(x) );
 
+    FILE *fi;
+    fi= fopen( "points.dat","w" );
+
     for( k=0;k<30;k++ )     // outer loop, through each SET of orthogonal vectors
     {
         // DEBUG
         printf( "***STEP %i*** \n\n", k );
+
+        fprintf( fi,"% 12.5e %12.5e \n", x[0],x[1] );
 
         int    hmin=-1;
         double fmin=1e16;
@@ -212,6 +217,7 @@ int main()
         // DEBUG
         results[k][0] = k + 1;
         results[k][3] = results[k][1] + results[k][2];
+        funceval += results[k][3];
 
         // Generate new set of orthogonal directions, see Equation 8 in the paper.
         for( h=0;h<dim;h++ )
@@ -227,16 +233,21 @@ int main()
             for( j=0;j<h;j++ ){ gsot( dim, v[h], v[j] ); }
             norml( dim, v[h] );
         }
-
-        // DEBUG: print results array
-        printf("***NUMBER OF FUNCTION EVALUATIONS FOR EACH ITERATION AND DIRECTION***\n");
-        printf("Step 1\tDir 0\tDir 1\tTotal\n");
-        for( h=0;h<30;h++ )
-        {
-            for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
-            printf(" \n");
-        }
     }
+
+    // DEBUG: print results array
+    printf("***NUMBER OF FUNCTION EVALUATIONS FOR EACH ITERATION AND DIRECTION***\n");
+    printf("Step 1\tDir 0\tDir 1\tTotal\n");
+    for( h=0;h<30;h++ )
+    {
+        for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
+        printf(" \n");
+    }
+
+    printf(" \n");
+    printf("%i function evaluations\n\n", funceval);
+
+    fclose( fi );
 
     exit(0);
 }
