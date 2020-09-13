@@ -33,13 +33,17 @@ inline double ipstep( double e1, double e2, double f1, double f2 )
     return ( f1*e2 - f2*e1 )/( f1 - f2 );
 }
 
-/* Compares function value at four reference points for line search */
-inline char least( double A, double B, double P )
+/* Compares function value at four reference points plus previous successful value for line search */
+inline char least( double A, double B, double P, double Q, double prev )
 {
-    if ( A<B && A<P ){
+    if ( A<B && A<P && A<Q && A<=prev ){
         return 'A';
-    } else if ( B<A && B<P ){
+    } else if ( B<A && B<P && B<Q && B<prev ){
         return 'B';
+    } else if ( Q<A && Q<B && Q<P && Q<prev ) {
+        return 'Q';
+    } else if ( prev<=A && prev<=B && prev<=P && prev<=Q ){
+        return 'S';
     } else {
         return 'P';
     }

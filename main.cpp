@@ -30,10 +30,10 @@ double fun( double *x )
  **/
 void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, int &results )
 {
-    double fP,fd,fB,fA,f0,ft;
+    double fQ,fP,fd,fB,fA,f0,ft,fsuccess;
     double gradA, gradB, gradt;
     double delta=1.e-6;
-    double xt[N],xd[N],xA[N],xB[N],xP[N];
+    double xt[N],xd[N],xA[N],xB[N],xP[N],xQ[N];
 
     int lsn = 0;
 
@@ -71,7 +71,7 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
 
         if (ft < f0){
             // calc gradient at original pt, taking descent direction as positive
-            gradA = (ft-f0)/delta;
+            gradA = (ft-f0)/fabs(delta);
             // We are moving in a direction of descent! Terminate the loop.
             dirfound = 1;
             printf("grad0 = %f \n", gradA);
@@ -102,16 +102,10 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     printf("***PERFORM LINE SEARCH***\n");
 
     // STEP LENGTHS
-    double eB, eP, eQ, esuccess;
+    double eB,eP,eQ,esuccess;
     eB = fabs(2319*gradA) * delta;
     double e0 = 0;
     double eA = e0;
-
-    // ROSENBROCK SLEDGEHAMMER
-    double a = 3;
-    double b = 0.5;     // values recommended by paper
-    int succount = 0;
-    int failcount = 0;
 
         /* %%%%%%%%%%%%%%%%%%%%%%%%%%%
             REGULA FALSI, FIVE TRIALS
@@ -119,57 +113,98 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
     fmav( dim, x0, 0, l, xA );  // duplicate x0 to xA and keep x0 as original
     fmav( dim, x0, eB, l, xB ); // set a point x1 some distance away
     fA = f0;
+    fsuccess = fA + 1;
     fB = fun(xB);
     lsn += 1;
 
     for (int i=1; i<=2; i++)
     {
-        // DEBUG
-        printf("A = %f, %f \tFA = %f\n",xA[0],xA[1],fA);
-        printf("B = %f, %f \tFB = %f   \teB = %f   \n",xB[0],xB[1],fB,eB);
-
         // evaluate gradient at x1
         fmav( dim, xB, delta, l, xd );  // offset x1 by delta
         fd = fun(xd);
+        lsn += 1;
         gradB = (fd-fB)/delta;
+
+        // DEBUG
+        printf("A = %f, %f \tFA = %f\n",xA[0],xA[1],fA);
+        printf("B = %f, %f \tFB = %f   \teB = %f   \tgradB = %f \n",xB[0],xB[1],fB,eB,gradB);
 
         // treat the descent direction as an axis, calculate step size, then calculate coordinates and function value
         eP = ipstep( eA, eB, -fA, fB );
         fmav( dim, x0, eP, l, xP );
         fP = fun(xP);
+        lsn += 1;
 
         // DEBUG
-        printf("P = %f, %f \tFP = %f    \teP = %f\t\t",xP[0],xP[1],fP,eP);
+        printf("P = %f, %f \tFP = %f    \teP = %f\t\n",xP[0],xP[1],fP,eP);
 
         /* Equation 15 can't be implemented on vectors!
            Instead we take A and B to be the step length along the searchdir. */
         eQ = (fB-fA+eA*gradA-eB*gradB)/(gradA-gradB);
+        if (eB < 0){eQ = -eQ;}
+        fmav( dim, x0, eQ, l, xQ );
+        fQ = fun(xQ);
+        lsn += 1;
+        printf("Q = %f, %f \tFQ = %f    \teQ = %f\tlsn = %i\n",xQ[0],xQ[1],fQ,eQ,lsn);
 
-        lsn += 2;
-        printf("eQ = %f\tlsn = %i\n",eQ,lsn);
-
-        switch(char minnie = least(fA, fB, fP))
+        switch(least(fA, fB, fP, fQ, fsuccess))
         {
+        case 'S':
+            // previous iteration yielded the lowest function value
+            break;
         case 'A':
             esuccess = eA;
+            fsuccess = fA;
             // A is lower than B and P. Shorten the bracket:
             eB = eP;
+            fB = fP;
             break;
         case 'B':
             esuccess = eB;
+            fsuccess = fB;
             // B is lower than P, we need to keep going:
-            eB *= 2;
+            eB = fabs(gradA/(gradA - gradB))*eB;
+            fmav( dim, x0, eB, l, xB );
+            fB = fun(xB);
+            lsn += 1;
             break;
-        default:
-            esuccess = eP;
+        case 'Q':
+            esuccess = eQ;
+            fsuccess = fQ;
             // narrow the bracket
             if (eP < eQ) {
                 eA = eP;
+                fA = fP;
                 eB = eQ;
+                fB = fQ;
             } else {
                 eA = eQ;
+                fA = fQ;
                 eB = eP;
+                fB = fP;
             }
+
+            i = 3;
+
+            break;
+        default:
+            esuccess = eP;
+            fsuccess = fP;
+            // narrow the bracket
+            if (eP < eQ) {
+                eA = eP;
+                fA = fP;
+                eB = eQ;
+                fB = fQ;
+            } else {
+                eA = eQ;
+                fA = fQ;
+                eB = eP;
+                fB = fP;
+            }
+
+            i = 3;
+
             break;
         }
 
@@ -178,23 +213,15 @@ void lsrch( int dim, double *x0, double *l, double &y, double &f, int &ismin, in
         // and update coordinates
         fmav( dim, x0, eA, l, xA );
         fmav( dim, x0, eB, l, xB );
-
-        fA = fun(xA);
-        fB = fun(xB);
-
-        lsn += 2;
     }
 
-    f = fP;         // write new function value
     if (fabs(esuccess) <= 1.e-6){
         y = (1.e-6);
     } else {
         y = esuccess;
     }
 
-    // float r = 1.15 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(0.1)));
-    // y *= r;
-
+    f = fsuccess;
     results = lsn;
     printf("\n");
 
@@ -205,7 +232,7 @@ int main()
 {
     int j,h,k;          // iteration variables
     int dim=N;          // number of dimensions of the problem
-    int outloops=30;    // set number of outer loops here
+    int outloops=35;    // set number of outer loops here
 
     double v[N][N]={ {1,0},{0,1} }; // orthogonal vectors, {0,1) and (1,0) for Rosenbrock
     double y[N]={0,0};
