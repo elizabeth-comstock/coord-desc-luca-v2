@@ -249,6 +249,7 @@ int main()
        Fourth column holds the total number of evaluations for the iteration.
      */
     int results[outloops][4];
+    int funceval = 0;
 
     // DEBUG
     printf( "Starting coordinates: c = %f, %f \n", x[0],x[1] );
@@ -293,6 +294,7 @@ int main()
         // DEBUG
         results[k][0] = k + 1;
         results[k][3] = results[k][1] + results[k][2];
+        funceval += results[k][3];
 
         // Generate new set of orthogonal directions, see Equation 8 in the paper.
         for( h=0;h<dim;h++ )
@@ -318,6 +320,9 @@ int main()
         for( j=0;j<4;j++ ){printf("%i\t", results[h][j]);}
         printf(" \n");
     }
+
+    printf(" \n");
+    printf("%i function evaluations\n\n", funceval);
 
     fclose( fi );
 
